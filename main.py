@@ -13,7 +13,8 @@ from tornado.log import enable_pretty_logging
 
 from web.database import db
 from web.entry import make_app
-from web.views import OpenIdLoginHandler, SimpleLoginHandler, GithubLoginHandler
+from web.views import OpenIdLoginHandler, SimpleLoginHandler, GithubLoginHandler, CASLoginHandler
+from web.settings import CAS_SETTINGS
 
 
 def machine_ip():
@@ -30,7 +31,8 @@ def main():
     _auth_handlers = {
         "simple": SimpleLoginHandler,
         "openid": OpenIdLoginHandler,
-        "github": GithubLoginHandler
+        "github": GithubLoginHandler,
+        "cas": CASLoginHandler
     }
 
     parser = argparse.ArgumentParser(
@@ -40,7 +42,7 @@ def main():
                         default=4000, help='listen port')
     parser.add_argument('-d', '--debug', action='store_true',
                         help='open debug log, and open hot reload')
-    parser.add_argument('--auth', type=str, default='simple',
+    parser.add_argument('--auth', type=str, default='cas',
                         choices=_auth_handlers.keys(), help='authentication method')
     parser.add_argument("--no-xheaders", action="store_true",
                         help="disable support for X-Real-Ip/X-Forwarded-For")
@@ -69,7 +71,9 @@ def main():
     app = make_app(login_handler, debug=args.debug)
     server = HTTPServer(app, xheaders=not args.no_xheaders)
     server.listen(args.port)
-    logger.info("listen on port http://%s:%d", machine_ip(), args.port)
+    server_url = "http://%s:%d" % (machine_ip(), args.port)
+    logger.info("listen on port %s", server_url)
+    CAS_SETTINGS["service_url"] = f"{server_url}/login" if args.auth == "cas" else CAS_SETTINGS["service_url"]
     try:
         ioloop.start()
     except KeyboardInterrupt:
